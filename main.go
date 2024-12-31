@@ -1,11 +1,14 @@
 package main
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"log"
 	"net"
 	"os"
-	"os/user"
 
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
@@ -122,35 +125,41 @@ func generateHostKey(privateKeyPath string) (ssh.Signer, error) {
 		// Jika tidak ada, generate kunci baru
 		log.Printf("Generating new host key at %s", privateKeyPath)
 
-		usr, _ := user.Current()
-		key, err := ssh.GenerateKey(ssh.RSA)
+		// Generate kunci RSA
+		privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 		if err != nil {
-			return nil, fmt.Errorf("failed to generate key: %w", err)
+			return nil, fmt.Errorf("failed to generate RSA key: %w", err)
 		}
 
-		// Simpan kunci privat
-		file, err := os.Create(privateKeyPath)
+		// Encode kunci privat ke format PEM
+		privateKeyFile, err := os.Create(privateKeyPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create private key file: %w", err)
 		}
-		defer file.Close()
+		defer privateKeyFile.Close()
 
-		if err := file.Chmod(0600); err != nil {
-			return nil, fmt.Errorf("failed to set permissions on key file: %w", err)
+		err = pem.Encode(privateKeyFile, &pem.Block{
+			Type:  "RSA PRIVATE KEY",
+			Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to encode private key: %w", err)
 		}
 
-		file.Write(key)
-		file.Close()
+		// Set permission file ke mode aman
+		if err := privateKeyFile.Chmod(0600); err != nil {
+			return nil, fmt.Errorf("failed to set permissions on key file: %w", err)
+		}
 	}
 
-	// Baca kunci privat
-	privateKey, err := os.ReadFile(privateKeyPath)
+	// Baca kunci privat dari file
+	privateKeyBytes, err := os.ReadFile(privateKeyPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read private key: %w", err)
 	}
 
 	// Parse kunci privat
-	signer, err := ssh.ParsePrivateKey(privateKey)
+	signer, err := ssh.ParsePrivateKey(privateKeyBytes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse private key: %w", err)
 	}
