@@ -22,7 +22,7 @@ func main() {
 	password := "x"
 
 	// Path kunci host
-	privateKeyPath := "/tmp/id_rsa" // Ganti dengan path kunci privat server
+	privateKeyPath := "id_rsa" // Ganti dengan path kunci privat server
 
 	// Generate atau baca kunci privat server
 	privateKey, err := generateHostKey(privateKeyPath)
